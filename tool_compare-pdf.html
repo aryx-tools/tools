@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Compare PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;min-height:100vh;padding:20px;display:flex;align-items:flex-start;justify-content:center;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:860px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;}
+.upload-col{flex:1;min-width:200px;}
+.upload-col p{font-size:13px;font-weight:700;margin-bottom:8px;color:#333;}
+.upload-area{border:2px dashed #d1c3c3;padding:20px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:10px 22px;border-radius:50px;cursor:pointer;font-size:14px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+.fname{font-size:12px;color:#666;margin-top:6px;text-align:center;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;display:block;margin:0 auto;}
+.action-btn:hover{background:#00796b;}
+#status{text-align:center;margin-top:12px;font-weight:600;color:#009688;display:none;}
+#result{display:none;margin-top:20px;}
+.compare-row{display:flex;gap:15px;flex-wrap:wrap;}
+.compare-col{flex:1;min-width:200px;}
+.compare-col h4{font-size:13px;font-weight:700;margin-bottom:8px;color:#333;}
+.compare-box{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;min-height:200px;font-size:13px;line-height:1.7;overflow-y:auto;max-height:400px;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Add two PDF versions to compare their text content side by side.</span>
+  <div class="upload-row">
+    <div class="upload-col">
+      <p>Original PDF</p>
+      <div class="upload-area">
+        <label class="select-btn">Choose File<input accept="application/pdf" id="file-a" type="file"/></label>
+      </div>
+      <div class="fname" id="name-a"></div>
+    </div>
+    <div class="upload-col">
+      <p>Updated PDF</p>
+      <div class="upload-area">
+        <label class="select-btn">Choose File<input accept="application/pdf" id="file-b" type="file"/></label>
+      </div>
+      <div class="fname" id="name-b"></div>
+    </div>
+  </div>
+  <button class="action-btn" id="compare-btn">Compare PDFs</button>
+  <div id="status"></div>
+  <div id="result">
+    <div class="compare-row">
+      <div class="compare-col">
+        <h4>Original</h4>
+        <div class="compare-box" id="left-box"></div>
+      </div>
+      <div class="compare-col">
+        <h4>Updated</h4>
+        <div class="compare-box" id="right-box"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let fileA=null,fileB=null;
+document.getElementById('file-a').addEventListener('change',e=>{fileA=e.target.files[0];document.getElementById('name-a').textContent=fileA?fileA.name:'';});
+document.getElementById('file-b').addEventListener('change',e=>{fileB=e.target.files[0];document.getElementById('name-b').textContent=fileB?fileB.name:'';});
+async function extractText(file){
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let text='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    text+=content.items.map(s=>s.str).join(' ')+'\n';
+  }
+  return text;
+}
+document.getElementById('compare-btn').addEventListener('click',async()=>{
+  if(!fileA||!fileB){alert('Please select both PDF files.');return;}
+  const status=document.getElementById('status');
+  status.style.display='block';status.textContent='Comparing...';
+  const textA=await extractText(fileA);
+  const textB=await extractText(fileB);
+  const wordsA=textA.split(/\s+/);
+  const wordsB=textB.split(/\s+/);
+  const setA=new Set(wordsA);const setB=new Set(wordsB);
+  const leftHtml=wordsA.map(w=>setB.has(w)?w:'<span style="background:#ffcdd2;border-radius:3px;padding:1px 3px;">'+w+'</span>').join(' ');
+  const rightHtml=wordsB.map(w=>setA.has(w)?w:'<span style="background:#c8e6c9;border-radius:3px;padding:1px 3px;">'+w+'</span>').join(' ');
+  document.getElementById('left-box').innerHTML=leftHtml;
+  document.getElementById('right-box').innerHTML=rightHtml;
+  document.getElementById('result').style.display='block';
+  status.textContent='Done. Red = removed, Green = added.';
+});
+</script>
+</body>
+</html>

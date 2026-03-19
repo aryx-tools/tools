@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Unlock PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+.options{display:none;text-align:center;margin-top:20px;}
+.options input{width:80%;max-width:350px;padding:11px 14px;border:1px solid #ddd;border-radius:8px;font-size:15px;outline:none;font-family:'Poppins',sans-serif;margin-bottom:14px;}
+.options input:focus{border-color:#009688;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;}
+.action-btn:hover{background:#00796b;}
+#status{text-align:center;margin-top:12px;font-weight:600;color:#009688;display:none;}
+.error-box{background:#fff3f3;border:1px solid #f44336;border-radius:8px;padding:12px 16px;color:#c62828;font-size:13px;margin-top:12px;display:none;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;margin-top:12px;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Upload your password-protected PDF and enter the password to unlock it.</span>
+  <div class="upload-area" id="drop-area">
+    <label class="select-btn">
+      + Choose PDF
+      <input accept="application/pdf" id="file-input" type="file"/>
+    </label>
+  </div>
+  <div class="options" id="options">
+    <input id="pass-input" placeholder="Enter current password" type="password"/><br/>
+    <button class="action-btn" id="unlock-btn">Unlock PDF</button>
+  </div>
+  <div id="status"></div>
+  <div class="error-box" id="error-box">Incorrect password or file could not be unlocked.</div>
+  <div style="text-align:center;">
+    <a class="download-btn" id="download-btn">Download Unlocked PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const drop=document.getElementById('drop-area');
+const inp=document.getElementById('file-input');
+const options=document.getElementById('options');
+const status=document.getElementById('status');
+const errorBox=document.getElementById('error-box');
+const dlBtn=document.getElementById('download-btn');
+let pdfFile=null;
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+drop.addEventListener('drop',e=>{pdfFile=e.dataTransfer.files[0];if(pdfFile)options.style.display='block';});
+inp.addEventListener('change',e=>{pdfFile=e.target.files[0];if(pdfFile)options.style.display='block';});
+document.getElementById('unlock-btn').addEventListener('click',async()=>{
+  const pass=document.getElementById('pass-input').value;
+  if(!pdfFile)return;
+  status.style.display='block';status.textContent='Unlocking...';errorBox.style.display='none';dlBtn.style.display='none';
+  try{
+    const {PDFDocument}=PDFLib;
+    const buf=await pdfFile.arrayBuffer();
+    const pdf=await PDFDocument.load(buf,{password:pass});
+    const out=await pdf.save();
+    const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+    dlBtn.href=url;dlBtn.download='unlocked.pdf';dlBtn.style.display='inline-block';
+    status.textContent='Done! Password removed.';
+  }catch(e){
+    status.style.display='none';errorBox.style.display='block';
+  }
+});
+</script>
+</body>
+</html>

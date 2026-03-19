@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Edit PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;min-height:100vh;padding:20px;display:flex;align-items:flex-start;justify-content:center;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:800px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+#edit-area{display:none;margin-top:20px;}
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+.controls label{font-size:13px;font-weight:600;color:#444;}
+.controls select,.controls input[type=number]{padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;outline:none;}
+.controls select:focus,.controls input[type=number]:focus{border-color:#009688;}
+#canvas-wrap{position:relative;display:inline-block;width:100%;text-align:center;}
+#edit-canvas{border:1px solid #ddd;cursor:crosshair;max-width:100%;border-radius:6px;}
+#text-inputs{margin-top:14px;}
+.text-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.text-row span{font-size:12px;color:#666;white-space:nowrap;}
+.text-row input[type=text]{flex:1;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;outline:none;}
+.text-row input[type=text]:focus{border-color:#009688;}
+.text-row button{background:#e53935;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;display:block;margin:16px auto 0;}
+.action-btn:hover{background:#00796b;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;margin:12px auto 0;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+#status{text-align:center;margin-top:10px;font-weight:600;color:#009688;display:none;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Upload your PDF, click on the page where you want to add text, then type your content.</span>
+  <div class="upload-area" id="drop-area">
+    <label class="select-btn">
+      + Choose PDF
+      <input accept="application/pdf" id="file-input" type="file"/>
+    </label>
+  </div>
+  <div id="edit-area">
+    <div class="controls">
+      <label>Page: <select id="page-sel"></select></label>
+      <label>Font size: <input id="font-size" max="36" min="8" type="number" value="14"/></label>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="edit-canvas"></canvas>
+    </div>
+    <div id="text-inputs"></div>
+    <button class="action-btn" id="save-btn">Save Edited PDF</button>
+    <div style="text-align:center;">
+      <a class="download-btn" id="download-btn">Download Edited PDF</a>
+    </div>
+    <div id="status"></div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let pdfBuf=null,pdfJsDoc=null,currentPage=1,textItems=[];
+const drop=document.getElementById('drop-area');
+const inp=document.getElementById('file-input');
+const editArea=document.getElementById('edit-area');
+const canvas=document.getElementById('edit-canvas');
+const ctx=canvas.getContext('2d');
+const pageSel=document.getElementById('page-sel');
+const textInputs=document.getElementById('text-inputs');
+const saveBtn=document.getElementById('save-btn');
+const dlBtn=document.getElementById('download-btn');
+const status=document.getElementById('status');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+drop.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
+inp.addEventListener('change',e=>load(e.target.files[0]));
+async function renderPage(n){
+  const page=await pdfJsDoc.getPage(n);
+  const vp=page.getViewport({scale:1.2});
+  canvas.width=vp.width;canvas.height=vp.height;
+  await page.render({canvasContext:ctx,viewport:vp}).promise;
+}
+async function load(file){
+  if(!file)return;
+  pdfBuf=await file.arrayBuffer();
+  pdfJsDoc=await pdfjsLib.getDocument({data:pdfBuf.slice(0)}).promise;
+  pageSel.innerHTML='';
+  for(let i=1;i<=pdfJsDoc.numPages;i++){const o=document.createElement('option');o.value=i;o.textContent='Page '+i;pageSel.appendChild(o);}
+  await renderPage(1);
+  editArea.style.display='block';
+}
+pageSel.addEventListener('change',async()=>{currentPage=parseInt(pageSel.value);await renderPage(currentPage);});
+canvas.addEventListener('click',e=>{
+  const r=canvas.getBoundingClientRect();
+  const scaleX=canvas.width/r.width;const scaleY=canvas.height/r.height;
+  const x=(e.clientX-r.left)*scaleX;const y=(e.clientY-r.top)*scaleY;
+  const fs=parseInt(document.getElementById('font-size').value)||14;
+  const id='t'+Date.now();
+  textItems.push({id,page:currentPage,x,y:canvas.height-y,text:'',fs});
+  const row=document.createElement('div');row.className='text-row';
+  row.innerHTML='<span>P'+currentPage+' ('+Math.round(x)+','+Math.round(canvas.height-y)+')</span><input data-id="'+id+'" placeholder="Type text..." type="text"/><button data-del="'+id+'">X</button>';
+  row.querySelector('[data-del]').addEventListener('click',function(){textItems=textItems.filter(t=>t.id!==id);row.remove();});
+  row.querySelector('[data-id]').addEventListener('input',function(){const item=textItems.find(t=>t.id===id);if(item)item.text=this.value;});
+  textInputs.appendChild(row);
+});
+saveBtn.addEventListener('click',async()=>{
+  saveBtn.textContent='Saving...';saveBtn.disabled=true;
+  status.style.display='block';status.textContent='Processing...';
+  const {PDFDocument,StandardFonts,rgb}=PDFLib;
+  const pdf=await PDFDocument.load(pdfBuf);
+  const font=await pdf.embedFont(StandardFonts.Helvetica);
+  const pages=pdf.getPages();
+  for(const item of textItems){
+    if(!item.text.trim())continue;
+    const page=pages[item.page-1];
+    const{height}=page.getSize();
+    const scale=page.getSize().width/canvas.width;
+    page.drawText(item.text,{x:item.x*scale,y:item.y*(height/canvas.height),size:item.fs,font,color:rgb(0,0,0)});
+  }
+  const out=await pdf.save();
+  const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dlBtn.href=url;dlBtn.download='edited.pdf';dlBtn.style.display='inline-block';
+  saveBtn.style.display='none';status.textContent='Done! Text added to PDF.';
+});
+</script>
+</body>
+</html>

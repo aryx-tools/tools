@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Scan to PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;min-height:100vh;padding:20px;display:flex;align-items:flex-start;justify-content:center;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.btn-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:20px;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 28px;border-radius:50px;cursor:pointer;font-size:15px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+.select-btn.secondary{background:#555;}
+.select-btn.secondary:hover{background:#333;}
+#preview{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:15px;}
+#preview img{width:80px;height:100px;object-fit:cover;border-radius:6px;border:2px solid #ddd;}
+#count{text-align:center;font-weight:600;color:#009688;display:none;margin-bottom:10px;font-size:14px;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;display:none;margin:0 auto;display:none;}
+.action-btn:hover{background:#00796b;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;margin-top:10px;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+#status{text-align:center;margin-top:10px;font-weight:600;color:#009688;display:none;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Use your phone camera to photograph documents or select existing images to create a PDF.</span>
+  <div class="btn-row">
+    <label class="select-btn">
+      Take Photo
+      <input accept="image/*" capture="environment" id="camera-inp" type="file"/>
+    </label>
+    <label class="select-btn secondary">
+      Add Images
+      <input accept="image/*" id="upload-inp" multiple type="file"/>
+    </label>
+  </div>
+  <div id="preview"></div>
+  <div id="count"></div>
+  <div style="text-align:center;">
+    <button class="action-btn" id="create-btn" style="display:none;">Create PDF</button>
+    <a class="download-btn" id="download-btn">Download PDF</a>
+  </div>
+  <div id="status"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+let imgFiles=[];
+const preview=document.getElementById('preview');
+const count=document.getElementById('count');
+const createBtn=document.getElementById('create-btn');
+const dlBtn=document.getElementById('download-btn');
+const status=document.getElementById('status');
+function addImages(files){
+  for(const f of files){
+    imgFiles.push(f);
+    const img=document.createElement('img');
+    const reader=new FileReader();
+    reader.onload=ev=>{img.src=ev.target.result;};
+    reader.readAsDataURL(f);
+    preview.appendChild(img);
+  }
+  count.style.display='block';count.textContent=imgFiles.length+' page(s) ready';
+  createBtn.style.display='inline-block';
+}
+document.getElementById('camera-inp').addEventListener('change',e=>addImages(e.target.files));
+document.getElementById('upload-inp').addEventListener('change',e=>addImages(e.target.files));
+createBtn.addEventListener('click',async()=>{
+  createBtn.textContent='Creating PDF...';createBtn.disabled=true;
+  status.style.display='block';status.textContent='Building PDF...';
+  const {PDFDocument}=PDFLib;
+  const pdf=await PDFDocument.create();
+  for(const f of imgFiles){
+    const buf=await f.arrayBuffer();
+    let img;
+    try{img=await pdf.embedJpg(buf);}catch(e){try{img=await pdf.embedPng(buf);}catch(e2){continue;}}
+    const page=pdf.addPage([img.width,img.height]);
+    page.drawImage(img,{x:0,y:0,width:img.width,height:img.height});
+  }
+  const out=await pdf.save();
+  const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dlBtn.href=url;dlBtn.download='scanned.pdf';dlBtn.style.display='inline-block';
+  createBtn.style.display='none';
+  status.textContent='Done! '+imgFiles.length+' page(s) converted.';
+});
+</script>
+</body>
+</html>

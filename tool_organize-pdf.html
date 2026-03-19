@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Organize PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;min-height:100vh;padding:20px;display:flex;align-items:flex-start;justify-content:center;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:800px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+#pages-grid{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:20px;}
+.page-card{text-align:center;position:relative;cursor:pointer;}
+.page-card canvas{border:2px solid #ddd;border-radius:6px;max-width:100px;display:block;}
+.page-card p{font-size:11px;margin-top:4px;color:#555;}
+.page-card .del-btn{position:absolute;top:2px;right:2px;background:#e53935;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:22px;font-weight:bold;}
+.page-card.removed{opacity:0.3;}
+#status{text-align:center;margin-top:15px;font-weight:600;color:#009688;display:none;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;display:none;margin-top:15px;}
+.action-btn:hover{background:#00796b;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Upload your PDF to view all pages. Click X to remove pages you don't need.</span>
+  <div class="upload-area" id="drop-area">
+    <label class="select-btn">
+      + Choose PDF
+      <input accept="application/pdf" id="file-input" type="file"/>
+    </label>
+  </div>
+  <div id="pages-grid"></div>
+  <div id="status"></div>
+  <div style="text-align:center;">
+    <button class="action-btn" id="save-btn">Download Organized PDF</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const drop=document.getElementById('drop-area');
+const inp=document.getElementById('file-input');
+const grid=document.getElementById('pages-grid');
+const status=document.getElementById('status');
+const saveBtn=document.getElementById('save-btn');
+let pdfBuf=null;let keepPages=[];
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+drop.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
+inp.addEventListener('change',e=>load(e.target.files[0]));
+async function load(file){
+  if(!file)return;
+  pdfBuf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:pdfBuf.slice(0)}).promise;
+  grid.innerHTML='';keepPages=[];
+  status.style.display='block';status.textContent='Loading pages...';
+  for(let i=1;i<=pdf.numPages;i++){
+    keepPages.push(i);
+    const page=await pdf.getPage(i);
+    const vp=page.getViewport({scale:0.4});
+    const canvas=document.createElement('canvas');
+    canvas.width=vp.width;canvas.height=vp.height;
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    const card=document.createElement('div');card.className='page-card';card.dataset.page=i;
+    const delBtn=document.createElement('button');delBtn.className='del-btn';delBtn.textContent='x';
+    delBtn.addEventListener('click',function(){
+      const pg=parseInt(card.dataset.page);
+      keepPages=keepPages.filter(p=>p!==pg);
+      card.classList.add('removed');
+      delBtn.style.display='none';
+    });
+    const label=document.createElement('p');label.textContent='Page '+i;
+    card.appendChild(delBtn);card.appendChild(canvas);card.appendChild(label);
+    grid.appendChild(card);
+  }
+  status.textContent='Click X on pages to remove them.';
+  saveBtn.style.display='inline-block';
+}
+saveBtn.addEventListener('click',async()=>{
+  if(!pdfBuf||keepPages.length===0)return;
+  saveBtn.textContent='Building...';saveBtn.disabled=true;
+  status.textContent='Creating PDF...';
+  const {PDFDocument}=PDFLib;
+  const src=await PDFDocument.load(pdfBuf);
+  const newPdf=await PDFDocument.create();
+  const pages=await newPdf.copyPages(src,keepPages.map(p=>p-1));
+  pages.forEach(p=>newPdf.addPage(p));
+  const out=await newPdf.save();
+  const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  const a=document.createElement('a');a.href=url;a.download='organized.pdf';a.click();
+  saveBtn.textContent='Download Organized PDF';saveBtn.disabled=false;
+  status.textContent='Done! '+keepPages.length+' page(s) saved.';
+});
+</script>
+</body>
+</html>
