@@ -95,7 +95,7 @@ async function handleFile(file) {
     showStatus('Starting task...');
 
     // Step 2: Start task
-    const taskRes = await fetch(API_BASE + '/start/pdfoffice', {
+    const taskRes = await fetch(API_BASE + '/start/pdfword', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     const taskData = await taskRes.json();
@@ -125,7 +125,7 @@ async function handleFile(file) {
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         task: task,
-        tool: 'pdfoffice',
+        tool: 'pdfword',
         files: [{ server_filename: serverFilename, filename: file.name }],
         outputformat: 'docx'
       })
