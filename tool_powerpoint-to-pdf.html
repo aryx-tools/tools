@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PowerPoint to PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+#pp2-status{display:none;text-align:center;margin-top:15px;font-weight:600;color:#009688;}
+.btn-row{text-align:center;margin-top:15px;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:12px 28px;font-size:15px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Select your PowerPoint file (.pptx) to convert it to PDF.</span>
+  <div class="upload-area">
+    <label class="select-btn">
+      + Choose PPTX File
+      <input accept=".pptx,.ppt" id="pp2-input" type="file"/>
+    </label>
+  </div>
+  <div id="pp2-status"></div>
+  <div class="btn-row">
+    <a class="download-btn" id="pp2-dl">Download PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const inp=document.getElementById('pp2-input');
+const status=document.getElementById('pp2-status');
+const dl=document.getElementById('pp2-dl');
+inp.addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  status.style.display='block';status.textContent='Reading slides...';dl.style.display='none';
+  try{
+    const buf=await file.arrayBuffer();
+    const zip=await JSZip.loadAsync(buf);
+    const slideFiles=Object.keys(zip.files).filter(f=>f.match(/^ppt\/slides\/slide[0-9]+\.xml$/)).sort();
+    const {PDFDocument,StandardFonts,rgb}=PDFLib;
+    const pdf=await PDFDocument.create();
+    const font=await pdf.embedFont(StandardFonts.Helvetica);
+    for(let si=0;si<slideFiles.length;si++){
+      const xml=await zip.files[slideFiles[si]].async('text');
+      const text=xml.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+      const page=pdf.addPage([720,540]);
+      const words=text.split(/\s+/);
+      let lines=[],cur='';
+      for(const w of words){
+        const t=cur?cur+' '+w:w;
+        if(font.widthOfTextAtSize(t,11)<=640)cur=t;
+        else{if(cur)lines.push(cur);cur=w;}
+      }
+      if(cur)lines.push(cur);
+      page.drawText('Slide '+(si+1),{x:40,y:500,size:14,font,color:rgb(0.2,0.2,0.2)});
+      lines.slice(0,28).forEach((l,i)=>{
+        page.drawText(l,{x:40,y:475-i*16,size:11,font,color:rgb(0,0,0)});
+      });
+    }
+    const out=await pdf.save();
+    dl.href=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+    dl.download='presentation.pdf';dl.style.display='inline-block';
+    status.textContent='Done. '+slideFiles.length+' slide(s) converted.';
+  }catch(err){
+    status.textContent='Could not read this file. Make sure it is a valid .pptx file.';
+    status.style.color='#e53935';
+  }
+});
+</script>
+</body>
+</html>

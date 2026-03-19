@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Excel to PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+#xl-status{display:none;text-align:center;margin-top:15px;font-weight:600;color:#009688;}
+.btn-row{text-align:center;margin-top:15px;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:12px 28px;font-size:15px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Select your Excel file (.xlsx) to convert it to a PDF document.</span>
+  <div class="upload-area">
+    <label class="select-btn">
+      + Choose Excel File
+      <input accept=".xlsx,.xls" id="xl-input" type="file"/>
+    </label>
+  </div>
+  <div id="xl-status"></div>
+  <div class="btn-row">
+    <a class="download-btn" id="xl-dl">Download PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const inp=document.getElementById('xl-input');
+const status=document.getElementById('xl-status');
+const dl=document.getElementById('xl-dl');
+inp.addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  status.style.display='block';status.textContent='Reading spreadsheet...';dl.style.display='none';
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  const {PDFDocument,StandardFonts,rgb}=PDFLib;
+  const pdf=await PDFDocument.create();
+  const font=await pdf.embedFont(StandardFonts.Helvetica);
+  const boldFont=await pdf.embedFont(StandardFonts.HelveticaBold);
+  const rowH=18,margin=40,pageW=842,pageH=595;
+  const rowsPerPage=Math.floor((pageH-margin*2)/rowH);
+  for(let i=0;i<data.length;i+=rowsPerPage){
+    const page=pdf.addPage([pageW,pageH]);
+    const chunk=data.slice(i,i+rowsPerPage);
+    chunk.forEach((row,ri)=>{
+      const y=pageH-margin-ri*rowH;
+      const isHeader=(i===0&&ri===0);
+      const colW=(pageW-margin*2)/Math.max(row.length,1);
+      row.forEach((cell,ci)=>{
+        const text=String(cell).substring(0,30);
+        page.drawText(text,{x:margin+ci*colW,y,size:9,font:isHeader?boldFont:font,color:rgb(0,0,0)});
+      });
+      if(isHeader){
+        page.drawLine({start:{x:margin,y:y-2},end:{x:pageW-margin,y:y-2},thickness:0.5,color:rgb(0.5,0.5,0.5)});
+      }
+    });
+  }
+  const out=await pdf.save();
+  dl.href=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dl.download='spreadsheet.pdf';dl.style.display='inline-block';
+  status.textContent='Done. '+data.length+' rows converted.';
+});
+</script>
+</body>
+</html>

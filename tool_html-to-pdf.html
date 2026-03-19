@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HTML to PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+#html-inp{width:100%;height:200px;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:monospace;resize:vertical;outline:none;margin-bottom:15px;}
+#html-inp:focus{border-color:#009688;}
+.btn-row{text-align:center;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;}
+.action-btn:hover{background:#00796b;}
+#html-status{display:none;text-align:center;margin-top:15px;font-weight:600;color:#009688;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:12px 28px;font-size:15px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;margin-top:12px;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Paste your HTML code below and convert it to a PDF document.</span>
+  <textarea id="html-inp" placeholder="Paste your HTML code here..."></textarea>
+  <div class="btn-row">
+    <button class="action-btn" id="html-btn">Convert to PDF</button>
+  </div>
+  <div id="html-status"></div>
+  <div style="text-align:center;">
+    <a class="download-btn" id="html-dl">Download PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+document.getElementById('html-btn').addEventListener('click',async()=>{
+  const html=document.getElementById('html-inp').value.trim();
+  if(!html){alert('Please paste some HTML code.');return;}
+  const status=document.getElementById('html-status');
+  const dl=document.getElementById('html-dl');
+  status.style.display='block';status.textContent='Converting...';dl.style.display='none';
+  const temp=document.createElement('div');temp.innerHTML=html;
+  const text=temp.textContent||temp.innerText||'';
+  const {PDFDocument,StandardFonts,rgb}=PDFLib;
+  const pdf=await PDFDocument.create();
+  const font=await pdf.embedFont(StandardFonts.Helvetica);
+  const pageW=595,pageH=842,margin=50,fs=11,lh=fs*1.6,maxW=pageW-margin*2;
+  const paras=text.split('\n').filter(p=>p.trim());
+  let lines=[];
+  for(const para of paras){
+    if(!para.trim()){lines.push('');continue;}
+    const words=para.split(/\s+/);
+    let cur='';
+    for(const w of words){
+      const t=cur?cur+' '+w:w;
+      if(font.widthOfTextAtSize(t,fs)<=maxW)cur=t;
+      else{if(cur)lines.push(cur);cur=w;}
+    }
+    if(cur)lines.push(cur);
+    lines.push('');
+  }
+  const lpp=Math.floor((pageH-margin*2)/lh);
+  for(let i=0;i<lines.length;i+=lpp){
+    const page=pdf.addPage([pageW,pageH]);
+    lines.slice(i,i+lpp).forEach((line,j)=>{
+      if(line.trim())page.drawText(line,{x:margin,y:pageH-margin-j*lh,size:fs,font,color:rgb(0,0,0)});
+    });
+  }
+  const out=await pdf.save();
+  dl.href=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dl.download='converted.pdf';dl.style.display='inline-block';
+  status.textContent='Conversion complete.';
+});
+</script>
+</body>
+</html>

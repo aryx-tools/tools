@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Word to PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+#w2p-status{display:none;text-align:center;margin-top:15px;font-weight:600;color:#009688;}
+.btn-row{text-align:center;margin-top:15px;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:12px 28px;font-size:15px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Select your Word document (.docx) to convert it to PDF.</span>
+  <div class="upload-area" id="w2p-drop">
+    <label class="select-btn">
+      + Choose Word File
+      <input accept=".docx,.doc" id="w2p-input" type="file"/>
+    </label>
+  </div>
+  <div id="w2p-status"></div>
+  <div class="btn-row">
+    <a class="download-btn" id="w2p-dl">Download PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const inp=document.getElementById('w2p-input');
+const status=document.getElementById('w2p-status');
+const dl=document.getElementById('w2p-dl');
+inp.addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  status.style.display='block';status.textContent='Converting...';dl.style.display='none';
+  const buf=await file.arrayBuffer();
+  const res=await mammoth.extractRawText({arrayBuffer:buf});
+  const text=res.value;
+  const {PDFDocument,StandardFonts,rgb}=PDFLib;
+  const pdf=await PDFDocument.create();
+  const font=await pdf.embedFont(StandardFonts.Helvetica);
+  const fs=11,margin=50,lineH=fs*1.6,pageW=595,pageH=842,maxW=pageW-margin*2;
+  const words=text.split(/\s+/);
+  let lines=[],cur='';
+  for(const w of words){
+    const t=cur?cur+' '+w:w;
+    if(font.widthOfTextAtSize(t,fs)<=maxW)cur=t;
+    else{if(cur)lines.push(cur);cur=w;}
+  }
+  if(cur)lines.push(cur);
+  const lpp=Math.floor((pageH-margin*2)/lineH);
+  for(let i=0;i<lines.length;i+=lpp){
+    const page=pdf.addPage([pageW,pageH]);
+    lines.slice(i,i+lpp).forEach((line,j)=>{
+      page.drawText(line,{x:margin,y:pageH-margin-j*lineH,size:fs,font,color:rgb(0,0,0)});
+    });
+  }
+  const out=await pdf.save();
+  const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dl.href=url;dl.download='converted.pdf';dl.style.display='inline-block';
+  status.textContent='Conversion complete.';
+});
+</script>
+</body>
+</html>
