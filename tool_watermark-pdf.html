@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Watermark PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+.options{display:none;margin-top:20px;text-align:center;}
+.options input[type=text]{width:80%;max-width:380px;padding:11px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;font-family:'Poppins',sans-serif;margin-bottom:14px;}
+.options input[type=text]:focus{border-color:#009688;}
+.options label{font-size:13px;font-weight:600;color:#444;}
+.options input[type=range]{width:200px;margin:0 8px;}
+#status{text-align:center;margin-top:12px;font-weight:600;color:#009688;display:none;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;margin-top:12px;}
+.action-btn:hover{background:#00796b;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;margin-top:12px;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Upload a PDF and enter the watermark text to stamp on every page.</span>
+  <div class="upload-area" id="drop-area">
+    <label class="select-btn">
+      + Choose PDF
+      <input accept="application/pdf" id="file-input" type="file"/>
+    </label>
+  </div>
+  <div class="options" id="options">
+    <input id="wm-text" placeholder="Enter watermark text (e.g. CONFIDENTIAL)" type="text" value="DRAFT"/><br/>
+    <label>Opacity: <input id="wm-opacity" max="80" min="10" type="range" value="30"/> <span id="op-val">30%</span></label><br/>
+    <button class="action-btn" id="wm-btn">Add Watermark</button>
+  </div>
+  <div id="status"></div>
+  <div style="text-align:center;">
+    <a class="download-btn" id="download-btn">Download Watermarked PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const drop=document.getElementById('drop-area');
+const inp=document.getElementById('file-input');
+const options=document.getElementById('options');
+const status=document.getElementById('status');
+const dlBtn=document.getElementById('download-btn');
+const opSlider=document.getElementById('wm-opacity');
+const opVal=document.getElementById('op-val');
+let pdfFile=null;
+opSlider.addEventListener('input',()=>opVal.textContent=opSlider.value+'%');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+drop.addEventListener('drop',e=>{pdfFile=e.dataTransfer.files[0];if(pdfFile)options.style.display='block';});
+inp.addEventListener('change',e=>{pdfFile=e.target.files[0];if(pdfFile)options.style.display='block';});
+document.getElementById('wm-btn').addEventListener('click',async()=>{
+  if(!pdfFile)return;
+  const text=document.getElementById('wm-text').value||'DRAFT';
+  const opacity=parseInt(opSlider.value)/100;
+  status.style.display='block';status.textContent='Adding watermark...';
+  const {PDFDocument,rgb,degrees,StandardFonts}=PDFLib;
+  const buf=await pdfFile.arrayBuffer();
+  const pdf=await PDFDocument.load(buf);
+  const font=await pdf.embedFont(StandardFonts.HelveticaBold);
+  pdf.getPages().forEach(page=>{
+    const {width,height}=page.getSize();
+    const fontSize=Math.min(width,height)*0.1;
+    const tw=font.widthOfTextAtSize(text,fontSize);
+    page.drawText(text,{x:width/2-tw/2,y:height/2-fontSize/2,size:fontSize,font,color:rgb(0.5,0.5,0.5),opacity,rotate:degrees(45)});
+  });
+  const out=await pdf.save();
+  const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dlBtn.href=url;dlBtn.download='watermarked.pdf';dlBtn.style.display='inline-block';
+  status.textContent='Done! Watermark added to all pages.';
+});
+</script>
+</body>
+</html>

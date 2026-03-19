@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Page Numbers PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+.options{display:none;text-align:center;margin-top:20px;}
+.options select,.options input[type=number]{padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;font-family:'Poppins',sans-serif;margin:5px;}
+.options select:focus,.options input[type=number]:focus{border-color:#009688;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;margin-top:12px;}
+.action-btn:hover{background:#00796b;}
+#status{text-align:center;margin-top:12px;font-weight:600;color:#009688;display:none;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;margin-top:12px;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Upload your PDF and choose where to place the page numbers.</span>
+  <div class="upload-area" id="drop-area">
+    <label class="select-btn">
+      + Choose PDF
+      <input accept="application/pdf" id="file-input" type="file"/>
+    </label>
+  </div>
+  <div class="options" id="options">
+    <label>Position: 
+      <select id="pos-select">
+        <option value="center">Bottom Center</option>
+        <option value="left">Bottom Left</option>
+        <option value="right">Bottom Right</option>
+      </select>
+    </label>
+    <label>Start from: 
+      <input id="start-num" min="1" style="width:65px;" type="number" value="1"/>
+    </label>
+    <br/>
+    <button class="action-btn" id="add-btn">Add Page Numbers</button>
+  </div>
+  <div id="status"></div>
+  <div style="text-align:center;">
+    <a class="download-btn" id="download-btn">Download Numbered PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const drop=document.getElementById('drop-area');
+const inp=document.getElementById('file-input');
+const options=document.getElementById('options');
+const status=document.getElementById('status');
+const dlBtn=document.getElementById('download-btn');
+let pdfFile=null;
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+drop.addEventListener('drop',e=>{pdfFile=e.dataTransfer.files[0];if(pdfFile)options.style.display='block';});
+inp.addEventListener('change',e=>{pdfFile=e.target.files[0];if(pdfFile)options.style.display='block';});
+document.getElementById('add-btn').addEventListener('click',async()=>{
+  if(!pdfFile)return;
+  const pos=document.getElementById('pos-select').value;
+  const start=parseInt(document.getElementById('start-num').value)||1;
+  status.style.display='block';status.textContent='Adding page numbers...';
+  const {PDFDocument,rgb,StandardFonts}=PDFLib;
+  const buf=await pdfFile.arrayBuffer();
+  const pdf=await PDFDocument.load(buf);
+  const font=await pdf.embedFont(StandardFonts.Helvetica);
+  pdf.getPages().forEach((page,i)=>{
+    const {width,height}=page.getSize();
+    const num=String(start+i);
+    const fs=11;
+    const tw=font.widthOfTextAtSize(num,fs);
+    let x=width/2-tw/2;
+    if(pos==='left')x=30;
+    if(pos==='right')x=width-tw-30;
+    page.drawText(num,{x,y:20,size:fs,font,color:rgb(0.3,0.3,0.3)});
+  });
+  const out=await pdf.save();
+  const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dlBtn.href=url;dlBtn.download='numbered.pdf';dlBtn.style.display='inline-block';
+  status.textContent='Done! Page numbers added.';
+});
+</script>
+</body>
+</html>

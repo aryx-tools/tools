@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Merge PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+.pdf-preview{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:20px;}
+.pdf-item{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px;width:130px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,0.06);}
+.pdf-item img{width:40px;height:40px;margin-bottom:6px;}
+.pdf-item p{font-size:11px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#status{text-align:center;margin-top:15px;font-weight:600;color:#009688;display:none;}
+.btn-row{text-align:center;margin-top:15px;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;display:none;}
+.action-btn:hover{background:#00796b;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Add your PDF files below. You can add as many as you need.</span>
+  <div class="upload-area" id="drop-area">
+    <label class="select-btn">
+      + Add PDFs
+      <input accept="application/pdf" id="file-input" multiple type="file"/>
+    </label>
+  </div>
+  <div class="pdf-preview" id="pdf-preview"></div>
+  <div id="status"></div>
+  <div class="btn-row">
+    <button class="action-btn" id="merge-btn">Merge PDF</button>
+    <a class="download-btn" id="download-btn">Download Merged PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const drop=document.getElementById('drop-area');
+const inp=document.getElementById('file-input');
+const preview=document.getElementById('pdf-preview');
+const status=document.getElementById('status');
+const mergeBtn=document.getElementById('merge-btn');
+const dlBtn=document.getElementById('download-btn');
+let files=[];
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+drop.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
+inp.addEventListener('change',e=>addFiles(e.target.files));
+function addFiles(fl){
+  for(const f of fl){
+    if(f.type==='application/pdf'){
+      files.push(f);
+      const item=document.createElement('div');item.className='pdf-item';
+      item.innerHTML='<img src="https://cdn-icons-png.flaticon.com/512/337/337946.png"/><p>'+f.name+'</p>';
+      preview.appendChild(item);
+    }
+  }
+  if(files.length>1)mergeBtn.style.display='inline-block';
+}
+mergeBtn.addEventListener('click',async()=>{
+  mergeBtn.textContent='Merging...';mergeBtn.disabled=true;
+  status.style.display='block';status.textContent='Merging '+files.length+' files...';
+  const {PDFDocument}=PDFLib;
+  const merged=await PDFDocument.create();
+  for(const f of files){
+    const buf=await f.arrayBuffer();
+    const pdf=await PDFDocument.load(buf);
+    const pages=await merged.copyPages(pdf,pdf.getPageIndices());
+    pages.forEach(p=>merged.addPage(p));
+  }
+  const out=await merged.save();
+  const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dlBtn.href=url;dlBtn.download='merged.pdf';
+  dlBtn.style.display='inline-block';mergeBtn.style.display='none';
+  status.textContent='Done! '+files.length+' files merged.';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PDF to JPG</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+#status{text-align:center;margin-top:15px;font-weight:600;color:#009688;display:none;}
+#preview{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin-top:20px;}
+.page-wrap{text-align:center;}
+.page-wrap img{max-width:140px;border:1px solid #ddd;border-radius:6px;display:block;margin-bottom:6px;}
+.dl-btn{background:#e53935;color:#fff;border:none;padding:7px 16px;font-size:12px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:inline-block;transition:background 0.2s;}
+.dl-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Upload a PDF to convert each page into a JPG image.</span>
+  <div class="upload-area" id="drop-area">
+    <label class="select-btn">
+      + Choose PDF
+      <input accept="application/pdf" id="file-input" type="file"/>
+    </label>
+  </div>
+  <div id="status"></div>
+  <div id="preview"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const drop=document.getElementById('drop-area');
+const inp=document.getElementById('file-input');
+const status=document.getElementById('status');
+const preview=document.getElementById('preview');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+drop.addEventListener('drop',e=>process(e.dataTransfer.files[0]));
+inp.addEventListener('change',e=>process(e.target.files[0]));
+async function process(file){
+  if(!file||file.type!=='application/pdf')return;
+  preview.innerHTML='';status.style.display='block';status.textContent='Converting...';
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  for(let i=1;i<=pdf.numPages;i++){
+    status.textContent='Converting page '+i+' of '+pdf.numPages+'...';
+    const page=await pdf.getPage(i);
+    const vp=page.getViewport({scale:1.5});
+    const canvas=document.createElement('canvas');
+    canvas.width=vp.width;canvas.height=vp.height;
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    const url=canvas.toDataURL('image/jpeg',0.92);
+    const wrap=document.createElement('div');wrap.className='page-wrap';
+    const img=document.createElement('img');img.src=url;
+    const a=document.createElement('a');a.href=url;a.download='page-'+i+'.jpg';
+    a.className='dl-btn';a.textContent='Download Page '+i;
+    wrap.appendChild(img);wrap.appendChild(a);preview.appendChild(wrap);
+  }
+  status.textContent='Done! '+pdf.numPages+' page(s) converted.';
+}
+</script>
+</body>
+</html>

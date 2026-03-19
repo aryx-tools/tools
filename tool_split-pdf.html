@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Split PDF</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:#f4f4f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.tool-wrap{background:#fff;border-radius:12px;padding:30px;max-width:700px;width:100%;box-shadow:0 4px 16px rgba(0,0,0,0.08);}
+.tool-info{font-size:14px;color:#444;background:#e0f7f4;padding:10px 14px;border-radius:8px;display:block;margin-bottom:20px;border-left:4px solid #009688;}
+.upload-area{border:2px dashed #d1c3c3;padding:40px;border-radius:10px;background:#fafafa;text-align:center;transition:0.3s;}
+.upload-area.dragover{border-color:#009688;background:#e0f7f4;}
+.select-btn{display:inline-block;background:#009688;color:#fff;padding:13px 32px;border-radius:50px;cursor:pointer;font-size:16px;font-family:'Poppins',sans-serif;position:relative;transition:background 0.2s;}
+.select-btn:hover{background:#00796b;}
+.select-btn input{position:absolute;opacity:0;left:0;top:0;width:100%;height:100%;cursor:pointer;}
+.options{display:none;margin-top:20px;text-align:center;}
+.options label{font-size:14px;font-weight:600;color:#333;margin-right:8px;}
+.options input[type=number]{width:65px;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;text-align:center;}
+.options input[type=number]:focus{border-color:#009688;}
+#status{text-align:center;margin-top:15px;font-weight:600;color:#009688;display:none;}
+.btn-row{text-align:center;margin-top:15px;}
+.action-btn{background:#009688;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;transition:background 0.2s;}
+.action-btn:hover{background:#00796b;}
+.download-btn{background:#e53935;color:#fff;border:none;padding:13px 32px;font-size:16px;border-radius:50px;cursor:pointer;font-family:'Poppins',sans-serif;text-decoration:none;display:none;margin-top:10px;transition:background 0.2s;}
+.download-btn:hover{background:#c62828;}
+</style>
+</head>
+<body>
+<div class="tool-wrap">
+  <span class="tool-info">Upload your PDF and enter the page range you want to extract.</span>
+  <div class="upload-area" id="drop-area">
+    <label class="select-btn">
+      + Choose PDF
+      <input accept="application/pdf" id="file-input" type="file"/>
+    </label>
+  </div>
+  <div class="options" id="options">
+    <label>From page:</label><input id="from-pg" min="1" type="number" value="1"/>
+    &nbsp;&nbsp;
+    <label>To page:</label><input id="to-pg" min="1" type="number" value="1"/>
+    <br/><br/>
+    <button class="action-btn" id="split-btn">Extract Pages</button>
+  </div>
+  <div id="status"></div>
+  <div class="btn-row">
+    <a class="download-btn" id="download-btn">Download Split PDF</a>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const drop=document.getElementById('drop-area');
+const inp=document.getElementById('file-input');
+const options=document.getElementById('options');
+const status=document.getElementById('status');
+const dlBtn=document.getElementById('download-btn');
+let pdfFile=null;
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+drop.addEventListener('drop',e=>{pdfFile=e.dataTransfer.files[0];if(pdfFile)options.style.display='block';});
+inp.addEventListener('change',e=>{pdfFile=e.target.files[0];if(pdfFile)options.style.display='block';});
+document.getElementById('split-btn').addEventListener('click',async()=>{
+  if(!pdfFile)return;
+  const from=parseInt(document.getElementById('from-pg').value)-1;
+  const to=parseInt(document.getElementById('to-pg').value)-1;
+  status.style.display='block';status.textContent='Extracting pages...';
+  const {PDFDocument}=PDFLib;
+  const buf=await pdfFile.arrayBuffer();
+  const src=await PDFDocument.load(buf);
+  const total=src.getPageCount();
+  const f=Math.max(0,from);const t=Math.min(total-1,to);
+  if(f>t){status.textContent='Invalid range.';return;}
+  const newPdf=await PDFDocument.create();
+  const indices=Array.from({length:t-f+1},(_,i)=>f+i);
+  const pages=await newPdf.copyPages(src,indices);
+  pages.forEach(p=>newPdf.addPage(p));
+  const out=await newPdf.save();
+  const url=URL.createObjectURL(new Blob([out],{type:'application/pdf'}));
+  dlBtn.href=url;dlBtn.download='split.pdf';dlBtn.style.display='inline-block';
+  status.textContent='Done! '+(t-f+1)+' page(s) extracted.';
+});
+</script>
+</body>
+</html>
