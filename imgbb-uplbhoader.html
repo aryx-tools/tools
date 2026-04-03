@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ImgBB Uploader</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #6c63ff;
+    --accent2: #ff6b9d;
+    --accent3: #00d4aa;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --success: #00d4aa;
+    --danger: #ff4d6d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* BG Mesh */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(108,99,255,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 30% at 80% 80%, rgba(255,107,157,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 60% 30%, rgba(0,212,170,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .logo-icon {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff 30%, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+  }
+
+  /* Upload Zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 20px;
+    padding: 56px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .upload-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(108,99,255,0.05), rgba(255,107,157,0.03));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .upload-zone:hover,
+  .upload-zone.dragover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 20px 60px rgba(108,99,255,0.15);
+  }
+
+  .upload-zone:hover::before,
+  .upload-zone.dragover::before {
+    opacity: 1;
+  }
+
+  .upload-zone.dragover {
+    border-color: var(--accent2);
+    background: rgba(108,99,255,0.05);
+  }
+
+  .upload-icon {
+    font-size: 52px;
+    margin-bottom: 16px;
+    display: block;
+    filter: drop-shadow(0 0 20px rgba(108,99,255,0.4));
+  }
+
+  .upload-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .upload-sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .browse-btn {
+    display: inline-block;
+    padding: 10px 28px;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    color: #fff;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .browse-btn:hover {
+    transform: scale(1.04);
+    box-shadow: 0 8px 30px rgba(108,99,255,0.4);
+  }
+
+  #fileInput { display: none; }
+
+  /* Preview Queue */
+  .preview-section {
+    display: none;
+    margin-bottom: 24px;
+  }
+
+  .section-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 14px;
+  }
+
+  .preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+  }
+
+  .preview-item {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+
+  .preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .preview-remove {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 22px;
+    height: 22px;
+    background: rgba(0,0,0,0.7);
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+
+  .preview-remove:hover { background: var(--danger); }
+
+  /* Upload Button */
+  .upload-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    letter-spacing: 0.03em;
+    display: none;
+    margin-bottom: 32px;
+  }
+
+  .upload-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(108,99,255,0.35);
+  }
+
+  .upload-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Progress */
+  .progress-wrap {
+    display: none;
+    margin-bottom: 32px;
+  }
+
+  .progress-bar-bg {
+    background: var(--surface2);
+    border-radius: 50px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 50px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  .progress-text {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* Results */
+  .results-section { display: none; margin-bottom: 40px; }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+
+  .result-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .result-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .result-url {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+  }
+
+  .copy-btn {
+    padding: 7px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .copy-btn:hover, .copy-btn.copied {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .copy-btn.copied { background: var(--success); border-color: var(--success); }
+
+  /* Gallery */
+  .gallery-section { margin-top: 8px; }
+
+  .gallery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .gallery-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .gallery-count {
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 4px 12px;
+    border-radius: 50px;
+    border: 1px solid var(--border);
+  }
+
+  .clear-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--danger);
+    background: transparent;
+    color: var(--danger);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .clear-btn:hover { background: var(--danger); color: #fff; }
+
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+  }
+
+  .gallery-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: all 0.25s;
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .gallery-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-4px);
+    box-shadow: 0 16px 40px rgba(108,99,255,0.2);
+  }
+
+  .gallery-img-wrap {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .gallery-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+  }
+
+  .gallery-card:hover .gallery-img-wrap img { transform: scale(1.05); }
+
+  .gallery-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.25s;
+    gap: 10px;
+  }
+
+  .gallery-card:hover .gallery-overlay { opacity: 1; }
+
+  .overlay-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: transform 0.2s;
+  }
+
+  .overlay-btn:hover { transform: scale(1.1); }
+  .overlay-view { background: var(--accent); color: #fff; }
+  .overlay-copy { background: var(--accent3); color: #000; }
+  .overlay-del { background: var(--danger); color: #fff; }
+
+  .gallery-meta {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .gallery-fname {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+  }
+
+  .gallery-size {
+    font-size: 10px;
+    color: var(--border);
+  }
+
+  .empty-gallery {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px dashed var(--border);
+  }
+
+  .empty-gallery .empty-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+  .empty-gallery p { font-size: 14px; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: transform 0.3s ease;
+    z-index: 9999;
+    white-space: nowrap;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--success); color: var(--success); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+
+  /* Lightbox */
+  .lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 9998;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .lightbox.open { display: flex; }
+
+  .lightbox-inner {
+    max-width: 90vw;
+    max-height: 90vh;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .lightbox-inner img {
+    max-width: 100%;
+    max-height: 80vh;
+    border-radius: 12px;
+    object-fit: contain;
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 28px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+
+  .lightbox-close:hover { opacity: 1; }
+
+  .lightbox-url {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 12px;
+    font-family: monospace;
+    color: var(--accent);
+    word-break: break-all;
+    text-align: center;
+    max-width: 600px;
+    cursor: pointer;
+  }
+
+  .lightbox-copy {
+    padding: 10px 28px;
+    background: linear-gradient(135deg, var(--accent3), #00a88a);
+    border: none;
+    border-radius: 50px;
+    color: #000;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .lightbox-copy:hover { transform: scale(1.04); }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 36px 0;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .result-card { flex-wrap: wrap; }
+    .upload-zone { padding: 40px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🖼️</div>
+      <span class="logo-text">ImgBB Uploader</span>
+    </div>
+    <p class="tagline">Upload images instantly · Copy URLs · Manage your library</p>
+  </div>
+
+  <!-- Drop Zone -->
+  <div class="upload-zone" id="dropZone">
+    <span class="upload-icon">☁️</span>
+    <div class="upload-title">Drop images here</div>
+    <p class="upload-sub">PNG, JPG, GIF, WEBP · Multiple files supported · Max 32MB each</p>
+    <label class="browse-btn" for="fileInput">Browse Files</label>
+    <input type="file" id="fileInput" multiple accept="image/*">
+  </div>
+
+  <!-- Preview Queue -->
+  <div class="preview-section" id="previewSection">
+    <div class="section-label">Selected Files</div>
+    <div class="preview-grid" id="previewGrid"></div>
+  </div>
+
+  <!-- Upload Button -->
+  <button class="browse-btn" onclick="openFilePicker()">Browse Files</button>
+    ⬆️ Upload All Images
+  </button>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-bg">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">Uploading...</div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="resultsSection">
+    <div class="section-label">Uploaded Just Now</div>
+    <div id="resultsList"></div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Gallery -->
+  <div class="gallery-section">
+    <div class="gallery-header">
+      <span class="gallery-title">My Library</span>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="gallery-count" id="galleryCount">0 images</span>
+        <button class="clear-btn" onclick="clearGallery()">Clear All</button>
+      </div>
+    </div>
+    <div class="gallery-grid" id="galleryGrid">
+      <div class="empty-gallery" style="grid-column:1/-1">
+        <span class="empty-icon">📂</span>
+        <p>No images yet. Upload some to get started!</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <div class="lightbox-inner">
+    <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+    <img id="lightboxImg" src="" alt="">
+    <div class="lightbox-url" id="lightboxUrl" onclick="copyLightboxUrl()"></div>
+    <button class="lightbox-copy" onclick="copyLightboxUrl()">📋 Copy Image URL</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const API_KEY = '7d837df2fe5cdd68ef59c09e47c55f1a';
+  const STORAGE_KEY = 'imgbb_gallery';
+
+  let selectedFiles = [];
+  let gallery = loadGallery();
+
+  // ---- Init ----
+  renderGallery();
+
+  // ---- Drag & Drop ----
+  const dropZone = document.getElementById('dropZone');
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) addFiles(files);
+  });
+
+  document.getElementById('fileInput').addEventListener('change', e => {
+    addFiles(Array.from(e.target.files));
+    e.target.value = '';
+  });
+
+  // ---- File Handling ----
+  function addFiles(files) {
+    selectedFiles = [...selectedFiles, ...files];
+    renderPreviews();
+  }
+
+  function renderPreviews() {
+    const section = document.getElementById('previewSection');
+    const grid = document.getElementById('previewGrid');
+    const btn = document.getElementById('uploadBtn');
+
+    if (selectedFiles.length === 0) {
+      section.style.display = 'none';
+      btn.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    btn.style.display = 'block';
+    btn.textContent = `⬆️ Upload ${selectedFiles.length} Image${selectedFiles.length > 1 ? 's' : ''}`;
+    grid.innerHTML = '';
+
+    selectedFiles.forEach((file, i) => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const div = document.createElement('div');
+        div.className = 'preview-item';
+        div.innerHTML = `
+          <img src="${ev.target.result}" alt="${file.name}">
+          <button class="preview-remove" onclick="removeFile(${i})">✕</button>
+        `;
+        grid.appendChild(div);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    renderPreviews();
+  }
+
+  // ---- Upload ----
+  async function startUpload() {
+    if (selectedFiles.length === 0) return;
+
+    const btn = document.getElementById('uploadBtn');
+    const progressWrap = document.getElementById('progressWrap');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsList = document.getElementById('resultsList');
+
+    btn.disabled = true;
+    progressWrap.style.display = 'block';
+    resultsSection.style.display = 'block';
+    resultsList.innerHTML = '';
+
+    const total = selectedFiles.length;
+    let done = 0;
+
+    for (const file of selectedFiles) {
+      progressText.textContent = `Uploading ${done + 1} of ${total}: ${file.name}`;
+
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('key', API_KEY);
+        formData.append('name', file.name.replace(/\.[^.]+$/, ''));
+
+        const res = await fetch('https://api.imgbb.com/1/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          const imgData = data.data;
+          const item = {
+            id: imgData.id,
+            name: imgData.title || file.name,
+            url: imgData.url,
+            thumb: imgData.thumb ? imgData.thumb.url : imgData.url,
+            display_url: imgData.display_url,
+            size: formatSize(file.size),
+            date: new Date().toLocaleDateString()
+          };
+
+          gallery.unshift(item);
+          saveGallery();
+          renderGallery();
+
+          // Add to results
+          const card = document.createElement('div');
+          card.className = 'result-card';
+          card.innerHTML = `
+            <img class="result-thumb" src="${item.thumb}" alt="${item.name}">
+            <div class="result-info">
+              <div class="result-name">${item.name}</div>
+              <div class="result-url">${item.url}</div>
+            </div>
+            <button class="copy-btn" onclick="copyUrl('${item.url}', this)">Copy URL</button>
+          `;
+          resultsList.appendChild(card);
+        } else {
+          showToast('Upload failed: ' + (data.error?.message || 'Unknown error'), 'error');
+        }
+      } catch (err) {
+        showToast('Error uploading ' + file.name, 'error');
+      }
+
+      done++;
+      progressBar.style.width = ((done / total) * 100) + '%';
+    }
+
+    progressText.textContent = `Done! ${done} image${done > 1 ? 's' : ''} uploaded.`;
+    btn.disabled = false;
+    selectedFiles = [];
+    renderPreviews();
+    showToast(`✅ ${done} image${done > 1 ? 's' : ''} uploaded successfully!`, 'success');
+  }
+
+  // ---- Gallery ----
+  function renderGallery() {
+    const grid = document.getElementById('galleryGrid');
+    const count = document.getElementById('galleryCount');
+    count.textContent = gallery.length + ' image' + (gallery.length !== 1 ? 's' : '');
+
+    if (gallery.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-gallery" style="grid-column:1/-1">
+          <span class="empty-icon">📂</span>
+          <p>No images yet. Upload some to get started!</p>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = '';
+    gallery.forEach((item, i) => {
+      const card = document.createElement('div');
+      card.className = 'gallery-card';
+      card.innerHTML = `
+        <div class="gallery-img-wrap" onclick="openLightbox('${item.url}', '${item.url}')">
+          <img src="${item.thumb}" alt="${item.name}" loading="lazy">
+          <div class="gallery-overlay">
+            <button class="overlay-btn overlay-view" title="View Full" onclick="openLightbox('${item.url}', '${item.url}'); event.stopPropagation()">🔍</button>
+            <button class="overlay-btn overlay-copy" title="Copy URL" onclick="copyUrl('${item.url}', this); event.stopPropagation()">📋</button>
+            <button class="overlay-btn overlay-del" title="Delete" onclick="deleteFromGallery(${i}); event.stopPropagation()">🗑️</button>
+          </div>
+        </div>
+        <div class="gallery-meta">
+          <div class="gallery-fname">${item.name}</div>
+          <div class="gallery-size">${item.size} · ${item.date}</div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  function deleteFromGallery(index) {
+    gallery.splice(index, 1);
+    saveGallery();
+    renderGallery();
+    showToast('🗑️ Image removed from library', 'success');
+  }
+
+  function clearGallery() {
+    if (gallery.length === 0) return;
+    if (confirm('Clear all images from library? (This only removes local records, not ImgBB images)')) {
+      gallery = [];
+      saveGallery();
+      renderGallery();
+      showToast('Library cleared', 'success');
+    }
+  }
+
+  // ---- Lightbox ----
+  function openLightbox(imgUrl, copyUrl) {
+    document.getElementById('lightboxImg').src = imgUrl;
+    document.getElementById('lightboxUrl').textContent = copyUrl;
+    document.getElementById('lightboxUrl').dataset.url = copyUrl;
+    document.getElementById('lightbox').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLightbox(e) {
+    if (!e || e.target === document.getElementById('lightbox') || e.target.classList.contains('lightbox-close')) {
+      document.getElementById('lightbox').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+  }
+
+  function copyLightboxUrl() {
+    const url = document.getElementById('lightboxUrl').dataset.url;
+    copyToClipboard(url);
+    showToast('✅ URL copied to clipboard!', 'success');
+  }
+
+  // ---- Helpers ----
+  function copyUrl(url, btn) {
+    copyToClipboard(url);
+    if (btn && btn.classList) {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy URL';
+        btn.classList.remove('copied');
+      }, 2000);
+    }
+    showToast('✅ URL copied!', 'success');
+  }
+
+  function copyToClipboard(text) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+  }
+
+  function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast show ' + type;
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+  function openFilePicker() {
+  document.getElementById('fileInput').click();
+}
+
+  function loadGallery() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    } catch { return []; }
+  }
+
+  function saveGallery() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(gallery));
+  }
+
+  // Keyboard ESC for lightbox
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeLightbox({ target: document.getElementById('lightbox') });
+  });
+</script>
+</body>
+</html>
